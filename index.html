@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeSpy — GitHub Repository Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b10;
+    --surface: #0d1117;
+    --surface2: #161b22;
+    --border: #21262d;
+    --accent: #00ff88;
+    --accent2: #ff6b35;
+    --accent3: #7c6dfa;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --danger: #f85149;
+    --warn: #d29922;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px; right: -200px;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,255,136,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* HEADER */
+  header { padding: 28px 0; border-bottom: 1px solid var(--border); position: relative; z-index: 1; }
+  .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 34px; height: 34px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo span { color: var(--accent); }
+
+  /* HERO */
+  .hero { padding: 72px 0 56px; text-align: center; }
+  .hero-badge {
+    display: inline-block; font-family: 'Space Mono', monospace; font-size: 11px;
+    color: var(--accent); border: 1px solid rgba(0,255,136,0.3); padding: 4px 14px;
+    border-radius: 20px; margin-bottom: 24px; letter-spacing: 2px; text-transform: uppercase;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+  .hero h1 { font-size: clamp(38px, 6vw, 72px); font-weight: 800; line-height: 1; letter-spacing: -3px; margin-bottom: 20px; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--muted); max-width: 460px; margin: 0 auto 44px; line-height: 1.8; }
+
+  /* SEARCH */
+  .search-wrap { max-width: 580px; margin: 0 auto; }
+  .search-box {
+    display: flex; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,255,136,0.1); }
+  .search-prefix {
+    font-family: 'Space Mono', monospace; font-size: 13px; color: var(--muted);
+    padding: 0 14px; display: flex; align-items: center; border-right: 1px solid var(--border);
+    background: var(--surface2); white-space: nowrap;
+  }
+  .search-input {
+    flex: 1; background: transparent; border: none; outline: none; color: var(--text);
+    font-family: 'Space Mono', monospace; font-size: 14px; padding: 15px 18px;
+  }
+  .search-input::placeholder { color: var(--muted); }
+  .search-btn {
+    background: var(--accent); color: #000; border: none; padding: 0 26px;
+    font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: background 0.2s; white-space: nowrap;
+  }
+  .search-btn:hover { background: #00cc6e; }
+  .search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .examples { margin-top: 14px; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted); }
+  .examples button {
+    background: none; border: 1px solid var(--border); color: var(--accent);
+    padding: 3px 10px; border-radius: 6px; font-family: 'Space Mono', monospace;
+    font-size: 11px; cursor: pointer; margin: 3px; transition: all 0.15s;
+  }
+  .examples button:hover { border-color: var(--accent); background: rgba(0,255,136,0.07); }
+
+  /* LOADING */
+  .loading { display: none; text-align: center; padding: 80px 0; }
+  .loading.active { display: block; }
+  .loader {
+    width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--muted); }
+  .loading-steps { margin-top: 16px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .loading-step {
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); padding: 4px 10px; border-radius: 20px;
+    transition: all 0.3s;
+  }
+  .loading-step.done { color: var(--accent); border-color: rgba(0,255,136,0.4); }
+  .loading-step.active { color: var(--warn); border-color: rgba(210,153,34,0.4); animation: pulse 1s infinite; }
+
+  /* ERROR */
+  .error-box {
+    display: none; background: rgba(248,81,73,0.08); border: 1px solid rgba(248,81,73,0.3);
+    border-radius: 12px; padding: 18px 22px; margin: 28px 0;
+    font-family: 'Space Mono', monospace; font-size: 13px; color: var(--danger);
+  }
+  .error-box.active { display: block; }
+
+  /* RESULTS */
+  #results { display: none; padding-bottom: 80px; }
+  #results.active { display: block; }
+
+  /* REPO HEADER */
+  .repo-header {
+    display: flex; align-items: flex-start; gap: 22px; padding: 40px 0 28px;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  .owner-avatar { width: 68px; height: 68px; border-radius: 14px; border: 2px solid var(--border); flex-shrink: 0; }
+  .repo-meta { flex: 1; min-width: 200px; }
+  .repo-name { font-size: 30px; font-weight: 800; letter-spacing: -1px; line-height: 1; margin-bottom: 8px; }
+  .repo-name a { color: var(--text); text-decoration: none; transition: color 0.2s; }
+  .repo-name a:hover { color: var(--accent); }
+  .repo-desc { color: var(--muted); font-size: 14px; margin-bottom: 12px; line-height: 1.6; }
+  .topics { display: flex; flex-wrap: wrap; gap: 7px; }
+  .topic {
+    font-family: 'Space Mono', monospace; font-size: 11px; background: rgba(124,109,250,0.12);
+    color: var(--accent3); border: 1px solid rgba(124,109,250,0.25); padding: 3px 10px; border-radius: 20px;
+  }
+
+  /* STATS BAR */
+  .stats-bar { display: flex; gap: 28px; flex-wrap: wrap; padding: 28px 0; border-bottom: 1px solid var(--border); }
+  .stat-item { display: flex; flex-direction: column; }
+  .stat-val { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+  .stat-lbl { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+  /* HEALTH */
+  .health-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 26px; display: flex; align-items: center; gap: 28px; margin-top: 28px; flex-wrap: wrap;
+  }
+  .grade-ring { position: relative; width: 88px; height: 88px; flex-shrink: 0; }
+  .grade-ring svg { transform: rotate(-90deg); }
+  .grade-ring-inner {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .grade-letter { font-size: 26px; font-weight: 800; line-height: 1; }
+  .grade-score { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+  .health-breakdown { flex: 1; min-width: 200px; }
+  .health-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px; }
+  .breakdown-item { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .breakdown-label { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); width: 90px; flex-shrink: 0; }
+  .breakdown-bar-wrap { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .breakdown-bar { height: 100%; background: var(--accent); border-radius: 3px; width: 0; transition: width 1.2s cubic-bezier(.4,0,.2,1); }
+  .breakdown-pts { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--text); width: 40px; text-align: right; flex-shrink: 0; }
+
+  /* GRID */
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; margin-top: 28px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .card:hover { border-color: rgba(0,255,136,0.25); transform: translateY(-1px); }
+  .card-title {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--muted); margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .col-4 { grid-column: span 4; }
+  .col-5 { grid-column: span 5; }
+  .col-6 { grid-column: span 6; }
+  .col-7 { grid-column: span 7; }
+  .col-8 { grid-column: span 8; }
+  .col-12 { grid-column: span 12; }
+  @media (max-width: 860px) { .col-4,.col-5,.col-6,.col-7,.col-8 { grid-column: span 12; } }
+
+  /* LINGUAGENS */
+  .lang-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 18px; gap: 2px; }
+  .lang-segment { transition: flex 1s ease; }
+  .lang-list { display: flex; flex-direction: column; gap: 9px; }
+  .lang-item { display: flex; align-items: center; gap: 10px; }
+  .lang-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .lang-name { font-family: 'Space Mono', monospace; font-size: 12px; flex: 1; }
+  .lang-pct { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  /* ATIVIDADE */
+  .activity-chart { width: 100%; height: 90px; display: flex; align-items: flex-end; gap: 3px; }
+  .activity-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; height: 100%; justify-content: flex-end; }
+  .act-bar { width: 100%; background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0.75; min-height: 2px; transition: height 1s ease, opacity 0.2s; }
+  .act-bar:hover { opacity: 1; }
+  .act-label { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); }
+
+  /* HORA */
+  .hour-chart { display: flex; align-items: flex-end; gap: 2px; height: 56px; width: 100%; }
+  .hour-bar { flex: 1; border-radius: 2px 2px 0 0; background: var(--accent3); opacity: 0.65; min-height: 2px; transition: opacity 0.15s; cursor: default; }
+  .hour-bar:hover { opacity: 1; }
+  .hour-labels { display: flex; justify-content: space-between; margin-top: 6px; font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+
+  /* CONTRIBUIDORES */
+  .contributors-list { display: flex; flex-direction: column; gap: 11px; }
+  .contributor { display: flex; align-items: center; gap: 11px; }
+  .contributor img { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); }
+  .contributor-info { flex: 1; min-width: 0; }
+  .contributor-name { font-family: 'Space Mono', monospace; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .contributor-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; margin-top: 5px; overflow: hidden; }
+  .contributor-bar { height: 100%; background: var(--accent2); border-radius: 2px; width: 0; transition: width 1.2s ease; }
+  .contributor-count { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+  /* ISSUES */
+  .issues-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .issues-legend { display: flex; flex-direction: column; gap: 9px; }
+  .legend-item { display: flex; align-items: center; gap: 9px; font-family: 'Space Mono', monospace; font-size: 12px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  /* RELEASES */
+  .release-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .release-item:last-child { border-bottom: none; }
+  .release-tag { font-family: 'Space Mono', monospace; font-size: 11px; background: rgba(0,255,136,0.08); color: var(--accent); padding: 2px 8px; border-radius: 5px; flex-shrink: 0; }
+  .release-name { font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .release-date { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+
+  /* INFO */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .info-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  .info-val { font-family: 'Space Mono', monospace; font-size: 13px; }
+
+  /* RATE LIMIT */
+  .rate-note {
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted);
+    text-align: center; margin-top: 12px;
+  }
+  .rate-note a { color: var(--accent3); }
+
+  /* ANIMAÇÕES */
+  .fade-in { opacity: 0; transform: translateY(14px); animation: fadeIn 0.5s ease forwards; }
+  @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+  .d1{animation-delay:.05s} .d2{animation-delay:.12s} .d3{animation-delay:.2s} .d4{animation-delay:.28s} .d5{animation-delay:.36s}
+
+  footer { border-top: 1px solid var(--border); padding: 28px 0; text-align: center; font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted); position: relative; z-index: 1; }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">
+      <div class="logo-icon">🔍</div>
+      Code<span>Spy</span>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">GitHub Intelligence · 100% Client-Side</div>
+    <h1>Radiografe qualquer<br><em>repositório</em></h1>
+    <p>Análise real de atividade, saúde, linguagens e contribuidores — direto da API do GitHub, sem servidor.</p>
+
+    <div class="search-wrap">
+      <div class="search-box">
+        <span class="search-prefix">github.com/</span>
+        <input id="search-input" class="search-input" type="text" placeholder="owner/repository" autocomplete="off" spellcheck="false"/>
+        <button class="search-btn" id="search-btn" onclick="analyze()">Analisar →</button>
+      </div>
+      <div class="examples">
+        Experimente:
+        <button onclick="setEx('torvalds/linux')">torvalds/linux</button>
+        <button onclick="setEx('facebook/react')">facebook/react</button>
+        <button onclick="setEx('fastapi/fastapi')">fastapi/fastapi</button>
+        <button onclick="setEx('microsoft/vscode')">microsoft/vscode</button>
+      </div>
+      <div class="rate-note">Sem token: 60 req/hora · <a href="https://github.com/settings/tokens" target="_blank">Gere um token</a> para 5.000 req/hora</div>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+  <div class="loading" id="loading">
+    <div class="loader"></div>
+    <p id="loading-text">Buscando dados...</p>
+    <div class="loading-steps">
+      <div class="loading-step" id="step-repo">Repositório</div>
+      <div class="loading-step" id="step-langs">Linguagens</div>
+      <div class="loading-step" id="step-commits">Commits</div>
+      <div class="loading-step" id="step-contributors">Contribuidores</div>
+      <div class="loading-step" id="step-issues">Issues</div>
+    </div>
+  </div>
+  <div class="error-box" id="error-box"></div>
+  <div id="results"></div>
+</div>
+
+<footer>
+  <div class="container">
+    CodeSpy · Dados via <a href="https://docs.github.com/en/rest" target="_blank">GitHub REST API</a> · Open Source em <a href="https://github.com/oBartcode/codespy" target="_blank">oBartcode/codespy</a>
+  </div>
+</footer>
+
+<script>
+const LANG_COLORS = {
+  Python:"#3572A5",JavaScript:"#f1e05a",TypeScript:"#2b7489",Java:"#b07219",
+  "C++":"#f34b7d",C:"#555555",Go:"#00ADD8",Rust:"#dea584",Ruby:"#701516",
+  PHP:"#4F5D95",Swift:"#ffac45",Kotlin:"#F18E33",Shell:"#89e051",
+  HTML:"#e34c26",CSS:"#563d7c",Vue:"#41b883",Dart:"#00B4AB",R:"#198CE7",
+  "C#":"#178600",Scala:"#c22d40",Haskell:"#5e5086",Lua:"#000080",
+  Perl:"#0298c3",Elixir:"#6e4a7e",Clojure:"#db5855",
+};
+
+function setEx(v){ document.getElementById('search-input').value=v; analyze(); }
+document.getElementById('search-input').addEventListener('keydown',e=>{ if(e.key==='Enter') analyze(); });
+
+function step(id, state){
+  const el = document.getElementById('step-'+id);
+  if(!el) return;
+  el.className = 'loading-step ' + state;
+}
+
+async function ghFetch(url){
+  const token = localStorage.getItem('gh_token') || '';
+  const headers = { 'Accept': 'application/vnd.github+json' };
+  if(token) headers['Authorization'] = 'Bearer ' + token;
+  const r = await fetch(url, { headers });
+  if(r.status === 403) throw new Error('Rate limit atingido. Adicione um token do GitHub nas configurações.');
+  if(r.status === 404) throw new Error('Repositório não encontrado. Verifique o nome e tente novamente.');
+  if(!r.ok) throw new Error(`Erro ${r.status} ao buscar dados do GitHub.`);
+  return r.json();
+}
+
+async function analyze(){
+  const raw = document.getElementById('search-input').value.trim().replace('https://github.com/','');
+  if(!raw) return;
+  const parts = raw.split('/');
+  if(parts.length < 2 || !parts[0] || !parts[1]){
+    showError('Formato inválido. Use: owner/repository (ex: facebook/react)');
+    return;
+  }
+  const [owner, repo] = parts;
+  const base = `https://api.github.com/repos/${owner}/${repo}`;
+
+  document.getElementById('loading').classList.add('active');
+  document.getElementById('error-box').classList.remove('active');
+  document.getElementById('results').classList.remove('active');
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('search-btn').disabled = true;
+  ['repo','langs','commits','contributors','issues'].forEach(s=>step(s,''));
+
+  try {
+    // Busca paralela
+    step('repo','active');
+    const repoData = await ghFetch(base);
+    step('repo','done');
+
+    step('langs','active');
+    step('commits','active');
+    step('contributors','active');
+    step('issues','active');
+
+    const [langs, commits, contributors, issues, releases] = await Promise.allSettled([
+      ghFetch(`${base}/languages`),
+      ghFetch(`${base}/commits?per_page=100`),
+      ghFetch(`${base}/contributors?per_page=10`),
+      ghFetch(`${base}/issues?state=all&per_page=100`),
+      ghFetch(`${base}/releases?per_page=5`),
+    ]);
+
+    step('langs','done'); step('commits','done'); step('contributors','done'); step('issues','done');
+
+    const langsData = langs.value || {};
+    const commitsData = commits.value || [];
+    const contributorsData = contributors.value || [];
+    const issuesData = issues.value || [];
+    const releasesData = releases.value || [];
+
+    render(repoData, langsData, commitsData, contributorsData, issuesData, releasesData);
+
+  } catch(e){
+    showError(e.message);
+  } finally {
+    document.getElementById('loading').classList.remove('active');
+    document.getElementById('search-btn').disabled = false;
+  }
+}
+
+function showError(msg){
+  const el = document.getElementById('error-box');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('active');
+  document.getElementById('results').classList.remove('active');
+}
+
+const fmt = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('pt-BR',{year:'numeric',month:'short',day:'numeric'}) : '—';
+const fmtAge = d => d>=365?`${Math.floor(d/365)} ano(s)`:d>=30?`${Math.floor(d/30)} meses`:`${d} dias`;
+const gradeColor = g => ({S:'#00ff88',A:'#00cc6e',B:'#7c6dfa',C:'#d29922',D:'#f85149'}[g]||'#7d8590');
+
+function calcHealth(repo, commits, openI, closedI, langs){
+  let score = 0, bd = [];
+  const rc = commits.length;
+  const rp = Math.min(30, Math.floor(rc/3));
+  score+=rp; bd.push({label:'Atividade',pts:rp,max:30,detail:`${rc} commits recentes`});
+  const dp = (repo.description?10:0)+(repo.license?7:0)+((repo.topics||[]).length?3:0);
+  score+=dp; bd.push({label:'Documentação',pts:dp,max:20,detail:'README, licença, tópicos'});
+  const pp = Math.min(20,Math.floor(Math.sqrt(repo.stargazers_count)));
+  score+=pp; bd.push({label:'Popularidade',pts:pp,max:20,detail:`${repo.stargazers_count} estrelas`});
+  const ti = openI.length+closedI.length;
+  const ip = ti>0?Math.floor((closedI.length/ti)*20):10;
+  score+=ip; bd.push({label:'Issues',pts:ip,max:20,detail:`${closedI.length} resolvidas`});
+  const lp = Math.min(10, Object.keys(langs).length*2);
+  score+=lp; bd.push({label:'Tech Stack',pts:lp,max:10,detail:`${Object.keys(langs).length} linguagens`});
+  const grade = score>=85?'S':score>=70?'A':score>=55?'B':score>=40?'C':'D';
+  return {score,grade,breakdown:bd};
+}
+
+function render(repo, langs, commits, contributors, issuesRaw, releases){
+  // Linguagens
+  const totalBytes = Object.values(langs).reduce((a,b)=>a+b,0)||1;
+  const langsArr = Object.entries(langs).sort((a,b)=>b[1]-a[1]).map(([n,b])=>({
+    name:n, bytes:b, pct:+(b/totalBytes*100).toFixed(1), color:LANG_COLORS[n]||'#8b949e'
+  }));
+
+  // Atividade mensal
+  const monthCounts = {};
+  commits.forEach(c=>{
+    try{
+      const d = new Date(c.commit.author.date);
+      const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      monthCounts[k]=(monthCounts[k]||0)+1;
+    }catch{}
+  });
+  const activity = [];
+  const now = new Date();
+  for(let i=11;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    activity.push({month:k.slice(5), commits:monthCounts[k]||0});
+  }
+
+  // Horas
+  const hourCounts = new Array(24).fill(0);
+  commits.forEach(c=>{
+    try{ hourCounts[new Date(c.commit.author.date).getHours()]++; }catch{}
+  });
+
+  // Issues
+  const openI = issuesRaw.filter(i=>i.state==='open'&&!i.pull_request);
+  const closedI = issuesRaw.filter(i=>i.state==='closed'&&!i.pull_request);
+
+  // Health
+  const health = calcHealth(repo, commits, openI, closedI, langs);
+  const gc = gradeColor(health.grade);
+  const age = Math.floor((Date.now()-new Date(repo.created_at))/86400000);
+
+  // SVG ring
+  const r=34, circ=2*Math.PI*r;
+  const filled = (health.score/100)*circ;
+  const ring = `<svg width="88" height="88" viewBox="0 0 88 88">
+    <circle cx="44" cy="44" r="${r}" fill="none" stroke="#21262d" stroke-width="10"/>
+    <circle cx="44" cy="44" r="${r}" fill="none" stroke="${gc}" stroke-width="10"
+      stroke-dasharray="${filled} ${circ}" stroke-linecap="round" style="transition:stroke-dasharray 1.2s ease"/>
+  </svg>`;
+
+  // Activity bars
+  const maxA = Math.max(...activity.map(a=>a.commits),1);
+  const actBars = activity.map(a=>`
+    <div class="activity-bar-wrap" title="${a.month}: ${a.commits} commits">
+      <div class="act-bar" style="height:${Math.round(a.commits/maxA*74)}px"></div>
+      <div class="act-label">${a.month}</div>
+    </div>`).join('');
+
+  // Hour bars
+  const maxH = Math.max(...hourCounts,1);
+  const hourBars = hourCounts.map((c,h)=>`
+    <div class="hour-bar" style="height:${Math.round(c/maxH*52)}px" title="${h}h: ${c} commits"></div>`).join('');
+
+  // Lang bar + list
+  const langBar = langsArr.slice(0,7).map(l=>
+    `<div class="lang-segment" style="flex:${l.pct};background:${l.color}" title="${l.name} ${l.pct}%"></div>`).join('');
+  const langList = langsArr.slice(0,8).map(l=>`
+    <div class="lang-item">
+      <div class="lang-dot" style="background:${l.color}"></div>
+      <span class="lang-name">${l.name}</span>
+      <span class="lang-pct">${l.pct}%</span>
+    </div>`).join('');
+
+  // Contributors
+  const maxC = (contributors[0]||{contributions:1}).contributions;
+  const contribList = contributors.slice(0,8).map(c=>`
+    <div class="contributor">
+      <img src="${c.avatar_url}" alt="${c.login}" loading="lazy">
+      <div class="contributor-info">
+        <div class="contributor-name">${c.login}</div>
+        <div class="contributor-bar-wrap">
+          <div class="contributor-bar" style="width:${Math.round(c.contributions/maxC*100)}%"></div>
+        </div>
+      </div>
+      <span class="contributor-count">${fmt(c.contributions)}</span>
+    </div>`).join('');
+
+  // Issues donut
+  const ti = openI.length+closedI.length||1;
+  const oc = 2*Math.PI*28;
+  const od = (openI.length/ti)*oc;
+  const donut = `<svg width="80" height="80" viewBox="0 0 80 80">
+    <circle cx="40" cy="40" r="28" fill="none" stroke="#21262d" stroke-width="10"/>
+    <circle cx="40" cy="40" r="28" fill="none" stroke="#00ff88" stroke-width="10"
+      stroke-dasharray="${oc-od} ${oc}" stroke-dashoffset="${oc*.25}" stroke-linecap="round"/>
+    <circle cx="40" cy="40" r="28" fill="none" stroke="#f85149" stroke-width="10"
+      stroke-dasharray="${od} ${oc}" stroke-dashoffset="${oc*.25-(oc-od)}" stroke-linecap="round"/>
+    <text x="40" y="44" text-anchor="middle" font-family="Space Mono" font-size="11" fill="#e6edf3">${ti}</text>
+  </svg>`;
+
+  // Breakdown
+  const breakdown = health.breakdown.map(b=>`
+    <div class="breakdown-item">
+      <span class="breakdown-label">${b.label}</span>
+      <div class="breakdown-bar-wrap"><div class="breakdown-bar" data-w="${Math.round(b.pts/b.max*100)}"></div></div>
+      <span class="breakdown-pts">${b.pts}/${b.max}</span>
+    </div>`).join('');
+
+  // Releases
+  const releaseList = Array.isArray(releases) && releases.length
+    ? releases.map(r=>`
+        <div class="release-item">
+          <span class="release-tag">${r.tag_name}</span>
+          <span class="release-name">${r.name||r.tag_name}</span>
+          <span class="release-date">${fmtDate(r.published_at)}</span>
+        </div>`).join('')
+    : '<p style="font-family:Space Mono;font-size:12px;color:var(--muted)">Nenhum release encontrado</p>';
+
+  // Topics
+  const topicsHtml = (repo.topics||[]).map(t=>`<span class="topic">${t}</span>`).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="repo-header fade-in d1">
+      <img class="owner-avatar" src="${repo.owner.avatar_url}" alt="avatar">
+      <div class="repo-meta">
+        <div class="repo-name"><a href="${repo.html_url}" target="_blank">${repo.full_name}</a></div>
+        <p class="repo-desc">${repo.description||'Sem descrição'}</p>
+        ${topicsHtml?`<div class="topics">${topicsHtml}</div>`:''}
+      </div>
+    </div>
+
+    <div class="stats-bar fade-in d2">
+      <div class="stat-item"><span class="stat-val">⭐ ${fmt(repo.stargazers_count)}</span><span class="stat-lbl">Stars</span></div>
+      <div class="stat-item"><span class="stat-val">🍴 ${fmt(repo.forks_count)}</span><span class="stat-lbl">Forks</span></div>
+      <div class="stat-item"><span class="stat-val">👁 ${fmt(repo.watchers_count)}</span><span class="stat-lbl">Watchers</span></div>
+      <div class="stat-item"><span class="stat-val">📁 ${(repo.size/1024).toFixed(1)} MB</span><span class="stat-lbl">Tamanho</span></div>
+      <div class="stat-item"><span class="stat-val">🕐 ${fmtAge(age)}</span><span class="stat-lbl">Idade</span></div>
+      <div class="stat-item"><span class="stat-val">🌿 ${repo.default_branch}</span><span class="stat-lbl">Branch</span></div>
+    </div>
+
+    <div class="health-card fade-in d2">
+      <div class="grade-ring">
+        ${ring}
+        <div class="grade-ring-inner">
+          <span class="grade-letter" style="color:${gc}">${health.grade}</span>
+          <span class="grade-score">${health.score}/100</span>
+        </div>
+      </div>
+      <div class="health-breakdown">
+        <div class="health-title">Score de Saúde do Repositório</div>
+        ${breakdown}
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card col-5 fade-in d3">
+        <div class="card-title">Linguagens</div>
+        <div class="lang-bar">${langBar||'<span style="font-family:Space Mono;font-size:12px;color:var(--muted)">Nenhuma detectada</span>'}</div>
+        <div class="lang-list">${langList||''}</div>
+      </div>
+
+      <div class="card col-7 fade-in d3">
+        <div class="card-title">Atividade — últimos 12 meses</div>
+        <div class="activity-chart">${actBars}</div>
+      </div>
+
+      <div class="card col-5 fade-in d4">
+        <div class="card-title">Top Contribuidores</div>
+        <div class="contributors-list">${contribList||'<p style="font-family:Space Mono;font-size:12px;color:var(--muted)">Sem dados</p>'}</div>
+      </div>
+
+      <div class="card col-4 fade-in d4">
+        <div class="card-title">Issues</div>
+        <div class="issues-wrap">
+          ${donut}
+          <div class="issues-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div><span>${openI.length} abertas</span></div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div><span>${closedI.length} resolvidas</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card col-3 fade-in d4">
+        <div class="card-title">Horário dos commits</div>
+        <div class="hour-chart">${hourBars}</div>
+        <div class="hour-labels"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
+      </div>
+
+      <div class="card col-6 fade-in d5">
+        <div class="card-title">Releases</div>
+        ${releaseList}
+      </div>
+
+      <div class="card col-6 fade-in d5">
+        <div class="card-title">Detalhes</div>
+        <div class="info-grid">
+          <div><div class="info-label">Licença</div><div class="info-val">${repo.license?.spdx_id||'Nenhuma'}</div></div>
+          <div><div class="info-label">Criado em</div><div class="info-val">${fmtDate(repo.created_at)}</div></div>
+          <div><div class="info-label">Atualizado</div><div class="info-val">${fmtDate(repo.updated_at)}</div></div>
+          <div><div class="info-label">Open Issues</div><div class="info-val">${fmt(repo.open_issues_count)}</div></div>
+          <div><div class="info-label">Tamanho</div><div class="info-val">${(repo.size/1024).toFixed(2)} MB</div></div>
+          <div><div class="info-label">Visibilidade</div><div class="info-val">${repo.private?'Privado':'Público'}</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('results').classList.add('active');
+
+  // Anima barras após render
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{
+      document.querySelectorAll('.breakdown-bar[data-w]').forEach(el=>{
+        el.style.width = el.dataset.w + '%';
+      });
+      document.querySelectorAll('.contributor-bar').forEach(el=>{
+        el.style.width = el.style.width; // trigger reflow
+      });
+    }, 100);
+  });
+
+  window.scrollTo({top: document.querySelector('.repo-header').offsetTop - 20, behavior:'smooth'});
+}
+</script>
+</body>
+</html>
